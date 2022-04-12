@@ -1,0 +1,45 @@
+server {
+       listen 80;
+       listen [::]:80;
+       listen 443 ssl;
+
+       server_name www.saineating.m00n.top;
+       ssl_certificate     /root/.acme.sh/www.saineating.m00n.top/www.saineating.m00n.top.cer;
+       ssl_certificate_key /root/.acme.sh/www.saineating.m00n.top/www.saineating.m00n.top.key;
+
+       root /var/www/saineating-landing/public;
+       index index.html index.debain.html index.nginx-debian.html;
+
+       add_header Access-Control-Allow-Origin *;
+
+       auth_basic           "Administrator’s Area";
+       auth_basic_user_file /root/saineating/htpasswd;
+
+       location / {
+               try_files $uri $uri/ =404;
+       }
+}
+
+server {
+       listen 80;
+       listen [::]:80;
+       listen 443 ssl;
+
+       server_name saineating.m00n.top;
+       ssl_certificate     /root/.acme.sh/saineating.m00n.top/saineating.m00n.top.cer;
+       ssl_certificate_key /root/.acme.sh/saineating.m00n.top/saineating.m00n.top.key;
+
+       root /var/www/saineating;
+       index index.html index.debain.html index.nginx-debian.html;
+
+       auth_basic           "Administrator’s Area";
+       auth_basic_user_file /root/saineating/htpasswd;
+
+       location /api/ {
+               proxy_pass http://127.0.0.1:4000/;
+       }
+
+       location / {
+               try_files $uri $uri/ =404;
+       }
+}

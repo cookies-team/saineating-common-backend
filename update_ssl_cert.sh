@@ -1,0 +1,4 @@
+/root/.acme.sh/acme.sh --issue -d www.saineating.ngx.fi --dns dns_cf
+/root/.acme.sh/acme.sh --issue -d saineating.ngx.fi --dns dns_cf
+/root/.acme.sh/acme.sh --issue -d www.saineating.m00n.top --dns dns_cf
+/root/.acme.sh/acme.sh --issue -d saineating.m00n.top --dns dns_cf
