@@ -9,7 +9,7 @@ server {
 
        add_header Access-Control-Allow-Origin *;
 
-       auth_basic           "Administrator’s Area";
+       auth_basic           "saineating maintaince area";
        auth_basic_user_file /var/www/.htpasswd;
 
        root /var/www/saineating-landing/public;
@@ -17,6 +17,10 @@ server {
 
        location / {
                try_files $uri $uri/ =404;
+       }
+
+       location /api/ {
+               proxy_pass http://127.0.0.1:4000/;
        }
 }
 
@@ -30,7 +34,7 @@ server {
        ssl_certificate     /root/.acme.sh/saineating.ngx.fi/saineating.ngx.fi.cer;
        ssl_certificate_key /root/.acme.sh/saineating.ngx.fi/saineating.ngx.fi.key;
 
-       auth_basic           "Administrator’s Area";
+       auth_basic           "saineating maintaince area";
        auth_basic_user_file /var/www/.htpasswd;
 
        root /var/www/saineating;
