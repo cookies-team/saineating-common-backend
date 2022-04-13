@@ -1,13 +1,18 @@
 server {
-       listen 80;
-       listen [::]:80;
+        listen 80;
+        listen [::]:80;
+
+        server_name www.saineating.ngx.fi saineating.ngx.fi;
+
+        return 301 https://$host$request_uri;
+}
+
+server {
        listen 443 ssl;
 
        server_name www.saineating.ngx.fi;
        ssl_certificate     /root/.acme.sh/www.saineating.ngx.fi/www.saineating.ngx.fi.cer;
        ssl_certificate_key /root/.acme.sh/www.saineating.ngx.fi/www.saineating.ngx.fi.key;
-
-       add_header Access-Control-Allow-Origin *;
 
        auth_basic           "saineating maintaince area";
        auth_basic_user_file /var/www/.htpasswd;
@@ -20,13 +25,12 @@ server {
        }
 
        location /api/ {
+               add_header Access-Control-Allow-Origin *;
                proxy_pass http://127.0.0.1:4000/;
        }
 }
 
 server {
-       listen 80;
-       listen [::]:80;
        listen 443 ssl;
 
        server_name saineating.ngx.fi;
