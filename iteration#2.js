@@ -72,11 +72,11 @@ router
                 }
                 if (recipe.name == null) {
                     recipe.name = item['Food Name']
-                    recipe.variants = []
+                    recipe.dishes = []
                 }
                 delete item['Food Name']
                 delete item['blic Food Key']
-                recipe.variants.push(item)
+                recipe.dishes.push(item)
             })
             console.log(recipe)
             ctx.body = recipe
@@ -142,7 +142,7 @@ router
     .get('/feeds', async (ctx, next) => {
         try {
             let feed = await parser.parseURL('http://feeds.101cookbooks.com/101cookbooks');
-          
+
             ctx.body = feed
         } catch (e) {
             ctx.status = 400;
