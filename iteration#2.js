@@ -5,7 +5,7 @@ const util = require('util');
 const app = new Koa();
 const router = new Router();
 let Parser = require('rss-parser');
-let parser = new Parser();
+let rssParser = new Parser();
 
 const mysql = require('mysql');
 const poolConfig = {
@@ -18,11 +18,37 @@ const poolConfig = {
 const pool = mysql.createPool(poolConfig)
 const query = util.promisify(pool.query).bind(pool);
 
+const feedSrcs = [
+    'https://www.skinnytaste.com/feed/',
+    'http://feeds.101cookbooks.com/101cookbooks'
+]
+let lastSyncTime = 0
+process.feeds = null
+
+async function syncFeeds() {
+    const now = Date.now() / 1000 | 0
+    if (now > lastSyncTime + 3600 || process.feeds == null) {
+        console.log("updateing feeds")
+        lastSyncTime = now
+        let _feeds = { items: [] }
+        await Promise.all(feedSrcs.map(async (src) => {
+            let rss = await rssParser.parseURL(src);
+            //TODO: support img download & show
+            _feeds.items = _feeds.items.concat(rss.items)
+        }))
+        _feeds.items.sort((a, b) => {
+            Date(a.isoDate) - Date(b.isoDate)
+        })
+        process.feeds = _feeds
+    }
+}
+
 router
     .get('/recipes', async (ctx, next) => {
         try {
-            const offset = ctx.request.query.offset || 0
-            const count = ctx.request.query.count || 10
+            const offset = parseInt(ctx.request.query.offset) || 0
+            const count = parseInt(ctx.request.query.count) || 12
+
             const rtn = await query(`SELECT * from RECIPE limit ${offset}, ${count};`)
             ctx.body = rtn
         } catch (e) {
@@ -141,9 +167,13 @@ router
     })
     .get('/feeds', async (ctx, next) => {
         try {
-            let feed = await parser.parseURL('http://feeds.101cookbooks.com/101cookbooks');
+            await syncFeeds()
 
-            ctx.body = feed
+            const offset = parseInt(ctx.request.query.offset) || 0
+            const count = parseInt(ctx.request.query.count) || 12
+
+            rtn = { items: process.feeds.items.slice(offset, Math.min(offset + count, process.feeds.items.length)) }
+            ctx.body = rtn
         } catch (e) {
             ctx.status = 400;
             console.log(e)
@@ -152,7 +182,19 @@ router
             };
         }
     })
+    .get('/feeds/count', async (ctx, next) => {
+        try {
+            await syncFeeds()
 
+            ctx.body = { count: process.feeds.items.length }
+        } catch (e) {
+            ctx.status = 400;
+            console.log(e)
+            ctx.body = {
+                error: e.toString()
+            };
+        }
+    })
 
 app
     .use(cors())
