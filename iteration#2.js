@@ -8,6 +8,7 @@ let Parser = require('rss-parser');
 let rssParser = new Parser();
 
 const mysql = require('mysql');
+const { match } = require('assert');
 const poolConfig = {
     connectionLimit: 10,
     socketPath: '/var/run/mysqld/mysqld.sock',
@@ -23,23 +24,33 @@ const feedSrcs = [
     'http://feeds.101cookbooks.com/101cookbooks'
 ]
 let lastSyncTime = 0
-process.feeds = null
+process.feedItems = null
+
+const regexImgSrc = /src="([^"]+)"/gm
+function getImgSrcsFromContent(content) {
+    matchSrcs = []
+    while ((arr = regexImgSrc.exec(content)) != null) {
+        matchSrcs.push(arr[1])
+    }
+    return matchSrcs
+}
 
 async function syncFeeds() {
     const now = Date.now() / 1000 | 0
-    if (now > lastSyncTime + 3600 || process.feeds == null) {
+    if (now > lastSyncTime + 3600 || process.feedItems == null) {
         console.log("updateing feeds")
         lastSyncTime = now
-        let _feeds = { items: [] }
+        let _feedItems = []
         await Promise.all(feedSrcs.map(async (src) => {
             let rss = await rssParser.parseURL(src);
-            //TODO: support img download & show
-            _feeds.items = _feeds.items.concat(rss.items)
+            rss.items.forEach((item)=>{
+                srcs = getImgSrcsFromContent(item['content:encoded'])   
+                item['srcs'] = srcs
+                _feedItems.push(item)
+            })
         }))
-        _feeds.items.sort((a, b) => {
-            Date(a.isoDate) - Date(b.isoDate)
-        })
-        process.feeds = _feeds
+
+        process.feedItems = _feedItems
     }
 }
 
@@ -145,18 +156,29 @@ router
     })
     .get('/search/suggestions', async (ctx, next) => {
         try {
+            await syncFeeds()
+
             console.log(ctx.params)
             rtn = await query(`SELECT \`Food Name\` from RECIPE;`) //TODO: avoid inject
             //TODO: add nu results
             //TODO: add cache for results
-            let recipes = []
+            let rtn = []
             rtn.forEach((item) => {
-                recipes.push({
+                rtn.push({
+                    type: 'food',
                     name: item['Food Name'].split(',')[0].trim(),
                     fullname: item['Food Name'],
                 })
             })
-            ctx.body = recipes
+            process.feedItems.forEach((feedItem) => {
+                rtn.push({
+                    type: 'news',
+                    name: feedItem.title,
+                    fullname: feedItem.title,
+                })
+            })
+
+            ctx.body = rtn
         } catch (e) {
             ctx.status = 400;
             console.log(e)
@@ -171,8 +193,10 @@ router
 
             const offset = parseInt(ctx.request.query.offset) || 0
             const count = parseInt(ctx.request.query.count) || 12
-
-            rtn = { items: process.feeds.items.slice(offset, Math.min(offset + count, process.feeds.items.length)) }
+            // _feeds.items.sort((a, b) => {
+            //     Date(a.isoDate) - Date(b.isoDate)
+            // })
+            rtn = { items: process.feedItems.slice(offset, Math.min(offset + count, process.feedItems.length)) }
             ctx.body = rtn
         } catch (e) {
             ctx.status = 400;
@@ -186,7 +210,7 @@ router
         try {
             await syncFeeds()
 
-            ctx.body = { count: process.feeds.items.length }
+            ctx.body = { count: process.feedItems.length }
         } catch (e) {
             ctx.status = 400;
             console.log(e)
