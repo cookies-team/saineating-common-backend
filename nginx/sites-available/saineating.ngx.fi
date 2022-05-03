@@ -25,10 +25,29 @@ server {
                 proxy_pass http://127.0.0.1:5000/;
         }
 
+        location /latest {
+                return 301 https://$host/iter2;
+        }
+
+        location /iter1 {
+                root /var/www/saineating-iterations/;
+                try_files $uri $uri/ =404;
+        }
+
+        location /iter2 {
+                root /var/www/saineating-iterations/;
+                try_files $uri $uri/ =404;
+        }
+
+        location /design {
+                root /var/www/saineating-iterations/;
+                try_files $uri $uri/ =404;
+        }
+
         location / {
                 auth_basic           "saineating maintaince area";
                 auth_basic_user_file /var/www/.htpasswd;
-
+ 
                 try_files $uri $uri/ =404;
         }
 }

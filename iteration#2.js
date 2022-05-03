@@ -219,6 +219,20 @@ router
             };
         }
     })
+    .get('/restaurants', async (ctx, next) => {
+        try {
+            console.log(ctx.params)
+            result = await query(`SELECT * from Restaurant;`)
+
+            ctx.body = result
+        } catch (e) {
+            ctx.status = 400;
+            console.log(e)
+            ctx.body = {
+                error: e.toString()
+            };
+        }
+    })
 
 app
     .use(cors())
