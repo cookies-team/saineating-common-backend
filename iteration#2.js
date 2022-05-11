@@ -236,12 +236,23 @@ router
     .get('/recipes_v2', async (ctx, next) => {
         try {
             console.log(ctx.params)
+
+            const offset = parseInt(ctx.request.query.offset) || 0
+            const count = parseInt(ctx.request.query.count) || 12
+
             filter = ""
             if (ctx.request.query.type) {
                 filter += `TypeName=${ctx.request.query.type}`
             } // can add more filter
             if (filter.length > 0) filter = "where " + filter
-            results = await query(`SELECT * from Recipe natural join CookingStep natural join Recipe_Ingredient natural join Recipe_Type natural join Ingredient natural join Type ${filter};`)
+            results = await query(`SELECT * from Recipe 
+            natural join CookingStep 
+            natural join Recipe_Ingredient 
+            natural join Recipe_Type 
+            natural join Ingredient 
+            natural join Type 
+            ${filter}
+            ;`)
 
             recipes = []
             results.forEach((row) => {
@@ -296,10 +307,96 @@ router
             };
         }
     })
+    .get('/recipes_v3', async (ctx, next) => {
+        try {
+            console.log(ctx.params)
+
+            const offset = parseInt(ctx.request.query.offset) || 0
+            const count = parseInt(ctx.request.query.count) || 12
+
+            filter = ""
+            if (ctx.request.query.type) {
+                filter += `TypeName=${ctx.request.query.type}`
+            } // can add more filter
+            if (filter.length > 0) filter = "where " + filter
+            results = await query(`SELECT * from Recipe 
+            natural join CookingStep 
+            natural join Recipe_Ingredient 
+            natural join Recipe_Type 
+            natural join Ingredient 
+            natural join Type 
+            ${filter}`)
+
+            recipes = []
+            results.forEach((row) => {
+                if (recipes[row.RecipeId] == null)
+                    recipes[row.RecipeId] = {
+                        id: row.RecipeId,
+                        name: row.RecipeName,
+                        cookingId: row.CookingId,
+                        details: row.Details,
+                        typeIds: [row.TypeID],
+                        types: [row.TypeName],
+                        ingredientIds: [row.IngredientId],
+                        ingredients: [
+                            {
+                                id: row.IngredientId,
+                                name: row.IngredientName,
+                                amount: row.Amount,
+                            }
+                        ],
+                    }
+                else {
+                    if (!recipes[row.RecipeId].typeIds.includes(row.TypeID)) {
+                        recipes[row.RecipeId].typeIds.push(row.TypeID)
+                        recipes[row.RecipeId].types.push(row.TypeName)
+                    }
+
+                    if (!recipes[row.RecipeId].ingredientIds.includes(row.IngredientId)) {
+                        recipes[row.RecipeId].ingredientIds.push(row.IngredientId)
+                        recipes[row.RecipeId].ingredients.push({
+                            id: row.IngredientId,
+                            name: row.IngredientName,
+                            amount: row.Amount,
+                        })
+                    }
+
+                }
+            })
+
+
+            switch (ctx.request.query.sort) {
+                case "alphabet":
+                    recipes.sort((a, b) => {
+                        a.name.localeCompare(b.name)
+                    })
+                default:
+                    recipes.sort((a, b) => {
+                        a.id < b.id
+                    })
+            }
+
+            ctx.body = recipes.filter(e => {
+                return e != null;
+            }).slice(offset, offset+count);
+        } catch (e) {
+            ctx.status = 400;
+            console.log(e)
+            ctx.body = {
+                error: e.toString()
+            };
+        }
+    })
     .get('/recipe_v2/:id', async (ctx, next) => {
         try {
             console.log(ctx.params)
-            results = await query(`SELECT * from Recipe natural join CookingStep natural join Recipe_Ingredient natural join Recipe_Type natural join Ingredient natural join Type where RecipeId = ${ctx.params.id};`)
+
+            results = await query(`SELECT * from Recipe natural join CookingStep 
+                natural join Recipe_Ingredient 
+                natural join Recipe_Type 
+                natural join Ingredient 
+                natural join Type 
+                where RecipeId = ${ctx.params.id};`)
 
             recipe = null
             results.forEach((row) => {
@@ -346,6 +443,19 @@ router
             };
         }
     })
+    .get('/recipes_v2/count', async (ctx, next) => {
+        try {
+            const rtn = await query(`SELECT count(*) as count from Recipe;`)
+            ctx.body = rtn[0]
+        } catch (e) {
+            ctx.status = 400;
+            console.log(e)
+            ctx.body = {
+                error: e.toString()
+            };
+        }
+    })
+
 app
     .use(cors())
     .use(router.routes())
