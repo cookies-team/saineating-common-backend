@@ -309,23 +309,29 @@ router
     })
     .get('/recipes_v3', async (ctx, next) => {
         try {
-            console.log(ctx.params)
+            console.log(ctx.params, ctx.request.query)
 
             const offset = parseInt(ctx.request.query.offset) || 0
             const count = parseInt(ctx.request.query.count) || 12
+            const sqlSort = ""
+            let filter = ""
 
-            filter = ""
             if (ctx.request.query.type) {
                 filter += `TypeName=${ctx.request.query.type}`
             } // can add more filter
             if (filter.length > 0) filter = "where " + filter
-            results = await query(`SELECT * from Recipe 
+            
+            results = await query(`
+            SELECT * from (SELECT * from Recipe limit ${offset}, ${count})
+                as Recipe
             natural join CookingStep 
             natural join Recipe_Ingredient 
             natural join Recipe_Type 
             natural join Ingredient 
-            natural join Type 
-            ${filter}`)
+            natural join Type
+            ${filter}
+            ${sqlSort}
+            `)
 
             recipes = []
             results.forEach((row) => {
@@ -378,7 +384,7 @@ router
 
             ctx.body = recipes.filter(e => {
                 return e != null;
-            }).slice(offset, offset+count);
+            });
         } catch (e) {
             ctx.status = 400;
             console.log(e)
