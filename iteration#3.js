@@ -149,23 +149,23 @@ router
 
             const typeFilters = []
             const allergyFilters = [] // 84, 24, 49, 10, 56, 35, 41, 20
-            let filter = ""
+            let filter = []
             if (types.length > 0) {
                 types.split(',').forEach((type) => {
                     typeFilters.push(`Find_In_Set(${type}, TypeIds)`)
                 })
 
-                filter += typeFilters.join(' OR ')
+                filter.push(typeFilters.join(' OR '))
             }
             if (allergies.length > 0) {
                 allergies.split(',').forEach((allergy) => {
                     allergyFilters.push(`NOT Find_In_Set(${allergy}, IngredientIds)`)
                 })
 
-                filter += allergyFilters.join(' AND ')
+                filter.push(allergyFilters.join(' AND '))
             }
 
-            if (filter) filter = "HAVING " + filter
+            filter.length? filter = "HAVING " + filter.join(" AND "): filter=""
 
             results = await query(`
         SELECT
@@ -223,23 +223,23 @@ router
 
             const typeFilters = []
             const allergyFilters = [] // 84, 24, 49, 10, 56, 35, 41, 20
-            let filter = ""
+            let filter = []
             if (types.length > 0) {
                 types.split(',').forEach((type) => {
                     typeFilters.push(`Find_In_Set(${type}, TypeIds)`)
                 })
 
-                filter += typeFilters.join(' OR ')
+                filter.push(typeFilters.join(' OR '))
             }
             if (allergies.length > 0) {
                 allergies.split(',').forEach((allergy) => {
                     allergyFilters.push(`NOT Find_In_Set(${allergy}, IngredientIds)`)
                 })
 
-                filter += allergyFilters.join(' AND ')
+                filter.push(allergyFilters.join(' AND '))
             }
 
-            if (filter) filter = "HAVING " + filter
+            filter.length? filter = "HAVING " + filter.join(" AND "): filter=""
 
             const rtn = await query(`        
             SELECT count(*) as count from (
