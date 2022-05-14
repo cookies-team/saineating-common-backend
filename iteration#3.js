@@ -271,12 +271,12 @@ router
             SELECT
                 TypeId,
                 TypeName,
-                count(RecipeId)
+                count(RecipeId) as count
             FROM
                 Recipe
             NATURAL JOIN Recipe_Type NATURAL JOIN Type GROUP BY TypeId;
         `)
-            ctx.body = rtn[0]
+            ctx.body = rtn
         } catch (e) {
             ctx.status = 400;
             console.log(e)
