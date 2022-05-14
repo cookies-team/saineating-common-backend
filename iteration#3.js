@@ -14,7 +14,7 @@ const poolConfig = {
     socketPath: '/var/run/mysqld/mysqld.sock',
     user: 'admin',
     password: 'icaneatglass',
-    database: 'Iteration3'
+    database: 'iteration3'
 }
 const pool = mysql.createPool(poolConfig)
 const query = util.promisify(pool.query).bind(pool);
@@ -55,128 +55,29 @@ async function syncFeeds() {
 }
 
 router
-    .get('/recipes', async (ctx, next) => {
-        try {
-            const offset = parseInt(ctx.request.query.offset) || 0
-            const count = parseInt(ctx.request.query.count) || 12
-
-            const rtn = await query(`SELECT * from RECIPE limit ${offset}, ${count};`)
-            ctx.body = rtn
-        } catch (e) {
-            ctx.status = 400;
-            console.log(e)
-            ctx.body = {
-                error: e.toString()
-            };
-        }
-    })
-    .get('/recipes/count', async (ctx, next) => {
-        try {
-            const rtn = await query(`SELECT count(*) as count from RECIPE;`)
-            ctx.body = rtn[0]
-        } catch (e) {
-            ctx.status = 400;
-            console.log(e)
-            ctx.body = {
-                error: e.toString()
-            };
-        }
-    })
-    .get('/recipe/filter/:ingredient', async (ctx, next) => {
-        try {
-            console.log(ctx.params)
-            result = await query(`SELECT * from RECIPE where \`IN\` like '%${ctx.params.ingredient}%';`) //TODO: avoid inject
-            // if (result.length == 0) {
-            //     throw "not found"
-            // }
-            ctx.body = result
-        } catch (e) {
-            ctx.status = 400;
-            console.log(e)
-            ctx.body = {
-                error: e.toString()
-            };
-        }
-    })
-    .get('/recipe/id/:bfk', async (ctx, next) => {
-        try {
-            console.log(ctx.params)
-            result = await query(`SELECT * from RECIPE where \`blic Food Key\` = '${ctx.params.bfk}' ;`) //TODO: avoid inject
-            let recipe = {}
-            result.forEach((item) => {
-                if (recipe.id == null) {
-                    recipe.id = ctx.params.bfk
-                }
-                if (recipe.name == null) {
-                    recipe.name = item['Food Name']
-                    recipe.dishes = []
-                }
-                delete item['Food Name']
-                delete item['blic Food Key']
-                recipe.dishes.push(item)
-            })
-            console.log(recipe)
-            ctx.body = recipe
-        } catch (e) {
-            ctx.status = 400;
-            console.log(e)
-            ctx.body = {
-                error: e.toString()
-            };
-        }
-    })
-    .get('/recipe/id/:bfk/:ipfk', async (ctx, next) => {
-        try {
-            console.log(ctx.params)
-            result = await query(`SELECT * from RECIPE where 'blic Food Key' = '${ctx.params.bfk}' and IPFK = '${ctx.params.ipfk}' ;`) //TODO: avoid inject
-            // if (result.length == 0) {
-            //     throw "not found"
-            // }
-            ctx.body = result[0]
-        } catch (e) {
-            ctx.status = 400;
-            console.log(e)
-            ctx.body = {
-                error: e.toString()
-            };
-        }
-    })
-    .get('/nutritions', async (ctx, next) => {
-        try {
-            console.log(ctx.params)
-            const rtn = await query('SELECT * from NUTRITION;')
-            ctx.body = rtn
-        } catch (e) {
-            ctx.status = 400;
-            console.log(e)
-            ctx.body = {
-                error: e.toString()
-            };
-        }
-    })
     .get('/search/suggestions', async (ctx, next) => {
         try {
             await syncFeeds()
 
             console.log(ctx.params)
-            const recipes = await query(`SELECT \`Food Name\` from RECIPE;`) //TODO: avoid inject
+            const recipes = await query(`SELECT \`RecipeName\` from RECIPE;`) //TODO: avoid inject
             //TODO: add nu results
             //TODO: add cache for results
             let rtn = []
             recipes.forEach((item) => {
                 rtn.push({
                     type: 'food',
-                    name: item['Food Name'].split(',')[0].trim(),
-                    fullname: item['Food Name'],
+                    name: item['RecipeName'].split(',')[0].trim(),
+                    fullname: item['RecipeName'],
                 })
             })
-            process.feedItems.forEach((feedItem) => {
-                rtn.push({
-                    type: 'news',
-                    name: feedItem.title,
-                    fullname: feedItem.title,
-                })
-            })
+            // process.feedItems.forEach((feedItem) => {
+            //     rtn.push({
+            //         type: 'news',
+            //         name: feedItem.title,
+            //         fullname: feedItem.title,
+            //     })
+            // })
 
             ctx.body = rtn
         } catch (e) {
@@ -233,70 +134,78 @@ router
             };
         }
     })
-    .get('/recipes_v2', async (ctx, next) => {
+    .get('/recipes', async (ctx, next) => {
         try {
-            console.log(ctx.params)
+            console.log(ctx.params, ctx.request.query)
 
             const offset = parseInt(ctx.request.query.offset) || 0
             const count = parseInt(ctx.request.query.count) || 12
+            const types = ctx.request.query.types || ""
+            const allergies = ctx.request.query.allergies || ""
+            const sort = ctx.request.query.sort == "alphabet" ?
+                "RecipeName" :
+                ctx.request.query.sort == "calorie" ?
+                    "CalorieLevel" : "RecipeId"
 
-            filter = ""
-            if (ctx.request.query.type) {
-                filter += `TypeName=${ctx.request.query.type}`
-            } // can add more filter
-            if (filter.length > 0) filter = "where " + filter
-            results = await query(`SELECT * from Recipe 
-            natural join CookingStep 
-            natural join Recipe_Ingredient 
-            natural join Recipe_Type 
-            natural join Ingredient 
-            natural join Type 
-            ${filter}
-            ;`)
+            const typeFilters = []
+            const allergyFilters = [] // 84, 24, 49, 10, 56, 35, 41, 20
+            let filter = ""
+            if (types.length > 0) {
+                types.split(',').forEach((type) => {
+                    typeFilters.push(`Find_In_Set(${type}, TypeIds)`)
+                })
+
+                filter += typeFilters.join(' OR ')
+            }
+            if (allergies.length > 0) {
+                allergies.split(',').forEach((allergy) => {
+                    allergyFilters.push(`NOT Find_In_Set(${allergy}, IngredientIds)`)
+                })
+
+                filter += allergyFilters.join(' AND ')
+            }
+
+            if (filter) filter = "HAVING " + filter
+
+            results = await query(`
+        SELECT
+            RecipeId,
+            RecipeName,
+            CookingId,
+            MinAge,
+            CalorieLevel,
+            CookingId,
+            Details,
+            CookingTime,
+            GROUP_CONCAT(DISTINCT TypeId) as TypeIds,
+            GROUP_CONCAT(DISTINCT TypeName) as TypeNames,
+            GROUP_CONCAT(DISTINCT IngredientId) as IngredientIds,
+            GROUP_CONCAT(DISTINCT IngredientName SEPARATOR '|') as IngredientNames,
+            GROUP_CONCAT(Amount) as Amounts
+        FROM
+            Recipe
+        NATURAL JOIN CookingStep GROUP_CONCAT NATURAL JOIN Recipe_Ingredient NATURAL JOIN Recipe_Type NATURAL JOIN Ingredient NATURAL JOIN Type GROUP BY RecipeId
+        ${filter} ORDER BY ${sort}
+        LIMIT ${offset}, ${count};`)
 
             recipes = []
             results.forEach((row) => {
-                if (recipes[row.RecipeId] == null)
-                    recipes[row.RecipeId] = {
-                        id: row.RecipeId,
-                        name: row.RecipeName,
-                        cookingId: row.CookingId,
-                        details: row.Details,
-                        typeIds: [row.TypeID],
-                        types: [row.TypeName],
-                        ingredientIds: [row.IngredientId],
-                        ingredients: [
-                            {
-                                id: row.IngredientId,
-                                name: row.IngredientName,
-                                amount: row.Amount,
-                            }
-                        ],
-                    }
-                else {
-                    if (!recipes[row.RecipeId].typeIds.includes(row.TypeID)) {
-                        recipes[row.RecipeId].typeIds.push(row.TypeID)
-                        recipes[row.RecipeId].types.push(row.TypeName)
-                    }
-
-                    if (!recipes[row.RecipeId].ingredientIds.includes(row.IngredientId)) {
-                        recipes[row.RecipeId].ingredientIds.push(row.IngredientId)
-                        recipes[row.RecipeId].ingredients.push({
-                            id: row.IngredientId,
-                            name: row.IngredientName,
-                            amount: row.Amount,
-                        })
-                    }
-
-                }
-            })
-
-
-            if (ctx.request.query.sort == "alphabet") {
-                recipes.sort((a, b) => {
-                    a.name.localeCompare(b.name)
+                recipes.push({
+                    RecipeId: row.RecipeId,
+                    RecipeName: row.RecipeName,
+                    CookingId: row.CookingId,
+                    MinAge: row.MinAge,
+                    CalorieLevel: row.CalorieLevel,
+                    CookingId: row.CookingId,
+                    Details: row.Details,
+                    CookingTime: row.CookingTime,
+                    TypeIds: row.TypeIds.split(','),
+                    TypeNames: row.TypeNames.split(','),
+                    IngredientIds: row.IngredientIds.split(','),
+                    IngredientNames: row.IngredientNames.split('|'),
+                    Amounts: row.Amounts.split(','),
                 })
-            }
+            })
 
             ctx.body = recipes
         } catch (e) {
@@ -307,84 +216,47 @@ router
             };
         }
     })
-    .get('/recipes_v3', async (ctx, next) => {
+    .get('/recipes/count', async (ctx, next) => {
         try {
-            console.log(ctx.params, ctx.request.query)
+            const types = ctx.request.query.types || ""
+            const allergies = ctx.request.query.allergies || ""
 
-            const offset = parseInt(ctx.request.query.offset) || 0
-            const count = parseInt(ctx.request.query.count) || 12
-            const sqlSort = ""
+            const typeFilters = []
+            const allergyFilters = [] // 84, 24, 49, 10, 56, 35, 41, 20
             let filter = ""
+            if (types.length > 0) {
+                types.split(',').forEach((type) => {
+                    typeFilters.push(`Find_In_Set(${type}, TypeIds)`)
+                })
 
-            if (ctx.request.query.type) {
-                filter += `TypeName=${ctx.request.query.type}`
-            } // can add more filter
-            if (filter.length > 0) filter = "where " + filter
-            
-            results = await query(`
-            SELECT * from (SELECT * from Recipe limit ${offset}, ${count})
-                as Recipe
-            natural join CookingStep 
-            natural join Recipe_Ingredient 
-            natural join Recipe_Type 
-            natural join Ingredient 
-            natural join Type
-            ${filter}
-            ${sqlSort}
-            `)
+                filter += typeFilters.join(' OR ')
+            }
+            if (allergies.length > 0) {
+                allergies.split(',').forEach((allergy) => {
+                    allergyFilters.push(`NOT Find_In_Set(${allergy}, IngredientIds)`)
+                })
 
-            recipes = []
-            results.forEach((row) => {
-                if (recipes[row.RecipeId] == null)
-                    recipes[row.RecipeId] = {
-                        id: row.RecipeId,
-                        name: row.RecipeName,
-                        cookingId: row.CookingId,
-                        details: row.Details,
-                        typeIds: [row.TypeID],
-                        types: [row.TypeName],
-                        ingredientIds: [row.IngredientId],
-                        ingredients: [
-                            {
-                                id: row.IngredientId,
-                                name: row.IngredientName,
-                                amount: row.Amount,
-                            }
-                        ],
-                    }
-                else {
-                    if (!recipes[row.RecipeId].typeIds.includes(row.TypeID)) {
-                        recipes[row.RecipeId].typeIds.push(row.TypeID)
-                        recipes[row.RecipeId].types.push(row.TypeName)
-                    }
-
-                    if (!recipes[row.RecipeId].ingredientIds.includes(row.IngredientId)) {
-                        recipes[row.RecipeId].ingredientIds.push(row.IngredientId)
-                        recipes[row.RecipeId].ingredients.push({
-                            id: row.IngredientId,
-                            name: row.IngredientName,
-                            amount: row.Amount,
-                        })
-                    }
-
-                }
-            })
-
-
-            switch (ctx.request.query.sort) {
-                case "alphabet":
-                    recipes.sort((a, b) => {
-                        a.name.localeCompare(b.name)
-                    })
-                default:
-                    recipes.sort((a, b) => {
-                        a.id < b.id
-                    })
+                filter += allergyFilters.join(' AND ')
             }
 
-            ctx.body = recipes.filter(e => {
-                return e != null;
-            });
+            if (filter) filter = "HAVING " + filter
+
+            const rtn = await query(`        
+            SELECT count(*) as count from (
+                SELECT
+                    RecipeId,
+                    GROUP_CONCAT(DISTINCT TypeId) as TypeIds,
+                    GROUP_CONCAT(DISTINCT TypeName) as TypeNames,
+                    GROUP_CONCAT(DISTINCT IngredientId) as IngredientIds,
+                    GROUP_CONCAT(DISTINCT IngredientName SEPARATOR '|') as IngredientNames,
+                    GROUP_CONCAT(DISTINCT Amount) as Amounts
+                FROM
+                    Recipe
+                NATURAL JOIN CookingStep GROUP_CONCAT NATURAL JOIN Recipe_Ingredient NATURAL JOIN Recipe_Type NATURAL JOIN Ingredient NATURAL JOIN Type GROUP BY RecipeId
+                ${filter}
+            ) as Recipe;
+        `)
+            ctx.body = rtn[0]
         } catch (e) {
             ctx.status = 400;
             console.log(e)
@@ -393,66 +265,78 @@ router
             };
         }
     })
-    .get('/recipe_v2/:id', async (ctx, next) => {
+    .get('/recipes/types', async (ctx, next) => {
+        try {
+            const rtn = await query(`SELECT * from Type;`)
+            ctx.body = rtn
+        } catch (e) {
+            ctx.status = 400;
+            console.log(e)
+            ctx.body = {
+                error: e.toString()
+            };
+        }
+    })
+    .get('/ingredients', async (ctx, next) => {
+        try {
+            const ids = ctx.request.query.ids
+
+            let filter = ""
+
+            if (ids) {
+                filter = `where IngredientId in (${ctx.request.query.ids})`
+            }
+
+            const rtn = await query(`SELECT * from Ingredient ${filter};`)
+            ctx.body = rtn
+        } catch (e) {
+            ctx.status = 400;
+            console.log(e)
+            ctx.body = {
+                error: e.toString()
+            };
+        }
+    })
+    .get('/recipe/:id', async (ctx, next) => {
         try {
             console.log(ctx.params)
 
-            results = await query(`SELECT * from Recipe natural join CookingStep 
-                natural join Recipe_Ingredient 
-                natural join Recipe_Type 
-                natural join Ingredient 
-                natural join Type 
-                where RecipeId = ${ctx.params.id};`)
-
-            recipe = null
-            results.forEach((row) => {
-                if (recipe == null)
-                    recipe = {
-                        id: row.RecipeId,
-                        name: row.RecipeName,
-                        cookingId: row.CookingId,
-                        details: row.Details,
-                        typeIds: [row.TypeID],
-                        types: [row.TypeName],
-                        ingredientIds: [row.IngredientId],
-                        ingredients: [
-                            {
-                                id: row.IngredientId,
-                                name: row.IngredientName,
-                                amount: row.Amount,
-                            }
-                        ],
-                    }
-                else {
-                    if (!recipe.typeIds.includes(row.TypeID)) {
-                        recipe.typeIds.push(row.TypeID)
-                        recipe.types.push(row.TypeName)
-                    }
-                    if (!recipe.ingredientIds.includes(row.IngredientId)) {
-                        recipe.ingredientIds.push(row.IngredientId)
-                        recipe.ingredients.push({
-                            id: row.IngredientId,
-                            name: row.IngredientName,
-                            amount: row.Amount,
-                        })
-                    }
-                }
-            })
-
-
-            ctx.body = recipe
-        } catch (e) {
-            ctx.status = 400;
-            console.log(e)
+            const results = await query(`
+        SELECT
+            RecipeId,
+            RecipeName,
+            CookingId,
+            MinAge,
+            CalorieLevel,
+            CookingId,
+            Details,
+            CookingTime,
+            GROUP_CONCAT(DISTINCT TypeId) as TypeIds,
+            GROUP_CONCAT(DISTINCT TypeName) as TypeNames,
+            GROUP_CONCAT(DISTINCT IngredientId) as IngredientIds,
+            GROUP_CONCAT(DISTINCT IngredientName SEPARATOR '|') as IngredientNames,
+            GROUP_CONCAT(DISTINCT CONCAT(IngredientId, '|' ,Amount)) as Amounts
+        FROM
+            Recipe
+        NATURAL JOIN CookingStep GROUP_CONCAT NATURAL JOIN Recipe_Ingredient NATURAL JOIN Recipe_Type NATURAL JOIN Ingredient NATURAL JOIN Type
+        GROUP BY RecipeId
+        HAVING RecipeId = ${ctx.params.id}`)
+            const result = results[0]
             ctx.body = {
-                error: e.toString()
-            };
-        }
-    })
-    .get('/recipes_v2/count', async (ctx, next) => {
-        try {
-            const rtn = await query(`SELECT count(*) as count from Recipe;`)
-            ctx.body = rtn[0]
+                RecipeId: result.RecipeId,
+                RecipeName: result.RecipeName,
+                CookingId: result.CookingId,
+                MinAge: result.MinAge,
+                CalorieLevel: result.CalorieLevel,
+                CookingId: result.CookingId,
+                Details: result.Details,
+                CookingTime: result.CookingTime,
+                TypeIds: result.TypeIds.split(','),
+                TypeNames: result.TypeNames.split(','),
+                IngredientIds: result.IngredientIds.split(','),
+                IngredientNames: result.IngredientNames.split('|'),
+                Amounts: result.Amounts.split(',').map((v)=>v.split('|')[1]),
+            }
         } catch (e) {
             ctx.status = 400;
             console.log(e)
@@ -466,4 +350,4 @@ app
     .use(cors())
     .use(router.routes())
     .use(router.allowedMethods());
-app.listen(5000);
+app.listen(6000);
