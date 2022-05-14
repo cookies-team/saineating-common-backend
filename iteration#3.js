@@ -184,7 +184,7 @@ router
             GROUP_CONCAT(Amount) as Amounts
         FROM
             Recipe
-        NATURAL JOIN CookingStep GROUP_CONCAT NATURAL JOIN Recipe_Ingredient NATURAL JOIN Recipe_Type NATURAL JOIN Ingredient NATURAL JOIN Type GROUP BY RecipeId
+        NATURAL JOIN CookingStep NATURAL JOIN Recipe_Ingredient NATURAL JOIN Recipe_Type NATURAL JOIN Ingredient NATURAL JOIN Type GROUP BY RecipeId
         ${filter} ORDER BY ${sort}
         LIMIT ${offset}, ${count};`)
 
@@ -252,9 +252,29 @@ router
                     GROUP_CONCAT(DISTINCT Amount) as Amounts
                 FROM
                     Recipe
-                NATURAL JOIN CookingStep GROUP_CONCAT NATURAL JOIN Recipe_Ingredient NATURAL JOIN Recipe_Type NATURAL JOIN Ingredient NATURAL JOIN Type GROUP BY RecipeId
+                NATURAL JOIN CookingStep NATURAL JOIN Recipe_Ingredient NATURAL JOIN Recipe_Type NATURAL JOIN Ingredient NATURAL JOIN Type GROUP BY RecipeId
                 ${filter}
             ) as Recipe;
+        `)
+            ctx.body = rtn[0]
+        } catch (e) {
+            ctx.status = 400;
+            console.log(e)
+            ctx.body = {
+                error: e.toString()
+            };
+        }
+    })
+    .get('/recipes/types/count', async (ctx, next) => {
+        try {
+            const rtn = await query(`        
+            SELECT
+                TypeId,
+                TypeName,
+                count(RecipeId)
+            FROM
+                Recipe
+            NATURAL JOIN Recipe_Type NATURAL JOIN Type GROUP BY TypeId;
         `)
             ctx.body = rtn[0]
         } catch (e) {
@@ -318,7 +338,7 @@ router
             GROUP_CONCAT(DISTINCT CONCAT(IngredientId, '|' ,Amount)) as Amounts
         FROM
             Recipe
-        NATURAL JOIN CookingStep GROUP_CONCAT NATURAL JOIN Recipe_Ingredient NATURAL JOIN Recipe_Type NATURAL JOIN Ingredient NATURAL JOIN Type
+        NATURAL JOIN CookingStep NATURAL JOIN Recipe_Ingredient NATURAL JOIN Recipe_Type NATURAL JOIN Ingredient NATURAL JOIN Type
         GROUP BY RecipeId
         HAVING RecipeId = ${ctx.params.id}`)
             const result = results[0]
