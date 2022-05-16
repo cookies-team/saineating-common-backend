@@ -154,8 +154,14 @@ router
     })
     .get('/restaurants', async (ctx, next) => {
         try {
-            console.log(ctx.params)
-            result = await query(`SELECT * from Restaurant join Type on Restaurant.RestTypeId = Type.TypeId;`)
+            console.log(ctx.params, ctx.request.query)
+            const loc = (ctx.request.query.loc || "145.133957,-37.907803").split(',')
+            const sort = ctx.request.query.sort == "alphabet" ?
+                "Name" :
+                ctx.request.query.sort == "distance" ?
+                    `(POW((longitude-${loc[0]}),2) + POW((latitude-${loc[1]}),2))` : "RestID"
+
+            result = await query(`SELECT * from Restaurant join Type on Restaurant.RestTypeId = Type.TypeId order by ${sort};`)
 
             ctx.body = result
         } catch (e) {
