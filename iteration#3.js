@@ -27,12 +27,35 @@ let lastSyncTime = 0
 process.feedItems = null
 
 const regexImgSrc = /src="([^"]+)"/gm
-function getImgSrcsFromContent(content) {
+const getImgSrcsFromContent = (content) => {
     matchSrcs = []
     while ((arr = regexImgSrc.exec(content)) != null) {
         matchSrcs.push(arr[1])
     }
     return matchSrcs
+}
+
+const recipeFilterBuilder = (types, allergies, calorie, age) => {
+    const typeFilters = []
+    const allergyFilters = [] // 84, 24, 49, 10, 56, 35, 41, 20
+    let filter = []
+    if (types.length > 0) {
+        types.split(',').forEach((type) => {
+            typeFilters.push(`Find_In_Set(${type}, TypeIds)`)
+        })
+
+        filter.push(typeFilters.join(' OR '))
+    }
+    if (allergies.length > 0) {
+        allergies.split(',').forEach((allergy) => {
+            allergyFilters.push(`NOT Find_In_Set(${allergy}, IngredientIds)`)
+        })
+
+        filter.push(allergyFilters.join(' AND '))
+    }
+
+    if (filter.length > 0) { return "HAVING " + filter.join(" AND ") }
+    else { return "" }
 }
 
 async function syncFeeds() {
@@ -140,32 +163,18 @@ router
 
             const offset = parseInt(ctx.request.query.offset) || 0
             const count = parseInt(ctx.request.query.count) || 12
+
             const types = ctx.request.query.types || ""
             const allergies = ctx.request.query.allergies || ""
+            const calorie = parseInt(ctx.request.query.calorie) || 0
+            const age = parseInt(ctx.request.query.age) || 0
+
             const sort = ctx.request.query.sort == "alphabet" ?
                 "RecipeName" :
                 ctx.request.query.sort == "calorie" ?
                     "CalorieLevel" : "RecipeId"
 
-            const typeFilters = []
-            const allergyFilters = [] // 84, 24, 49, 10, 56, 35, 41, 20
-            let filter = []
-            if (types.length > 0) {
-                types.split(',').forEach((type) => {
-                    typeFilters.push(`Find_In_Set(${type}, TypeIds)`)
-                })
-
-                filter.push(typeFilters.join(' OR '))
-            }
-            if (allergies.length > 0) {
-                allergies.split(',').forEach((allergy) => {
-                    allergyFilters.push(`NOT Find_In_Set(${allergy}, IngredientIds)`)
-                })
-
-                filter.push(allergyFilters.join(' AND '))
-            }
-
-            filter.length? filter = "HAVING " + filter.join(" AND "): filter=""
+            const filter = recipeFilterBuilder(types, allergies, calorie, age)
 
             results = await query(`
         SELECT
@@ -220,26 +229,10 @@ router
         try {
             const types = ctx.request.query.types || ""
             const allergies = ctx.request.query.allergies || ""
+            const calorie = parseInt(ctx.request.query.calorie) || 0
+            const age = parseInt(ctx.request.query.age) || 0
 
-            const typeFilters = []
-            const allergyFilters = [] // 84, 24, 49, 10, 56, 35, 41, 20
-            let filter = []
-            if (types.length > 0) {
-                types.split(',').forEach((type) => {
-                    typeFilters.push(`Find_In_Set(${type}, TypeIds)`)
-                })
-
-                filter.push(typeFilters.join(' OR '))
-            }
-            if (allergies.length > 0) {
-                allergies.split(',').forEach((allergy) => {
-                    allergyFilters.push(`NOT Find_In_Set(${allergy}, IngredientIds)`)
-                })
-
-                filter.push(allergyFilters.join(' AND '))
-            }
-
-            filter.length? filter = "HAVING " + filter.join(" AND "): filter=""
+            const filter = recipeFilterBuilder(types, allergies, calorie, age)
 
             const rtn = await query(`        
             SELECT count(*) as count from (
@@ -355,7 +348,7 @@ router
                 TypeNames: result.TypeNames.split(','),
                 IngredientIds: result.IngredientIds.split(','),
                 IngredientNames: result.IngredientNames.split('|'),
-                Amounts: result.Amounts.split(',').map((v)=>v.split('|')[1]),
+                Amounts: result.Amounts.split(',').map((v) => v.split('|')[1]),
             }
         } catch (e) {
             ctx.status = 400;
