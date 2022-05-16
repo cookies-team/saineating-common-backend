@@ -35,7 +35,7 @@ const getImgSrcsFromContent = (content) => {
     return matchSrcs
 }
 
-const recipeFilterBuilder = (types, allergies, calorie, age) => {
+const recipeFilterBuilder = (types, allergies, maxCal, minAge) => {
     const typeFilters = []
     const allergyFilters = [] // 84, 24, 49, 10, 56, 35, 41, 20
     let filter = []
@@ -46,12 +46,21 @@ const recipeFilterBuilder = (types, allergies, calorie, age) => {
 
         filter.push(typeFilters.join(' OR '))
     }
+
     if (allergies.length > 0) {
         allergies.split(',').forEach((allergy) => {
             allergyFilters.push(`NOT Find_In_Set(${allergy}, IngredientIds)`)
         })
 
         filter.push(allergyFilters.join(' AND '))
+    }
+
+    if (maxCal) {
+        filter.push(`CalorieLevel <= ${maxCal}`)
+    }
+
+    if (minAge) {
+        filter.push(`MinAge >= ${minAge}`)
     }
 
     if (filter.length > 0) { return "HAVING " + filter.join(" AND ") }
@@ -166,15 +175,15 @@ router
 
             const types = ctx.request.query.types || ""
             const allergies = ctx.request.query.allergies || ""
-            const calorie = parseInt(ctx.request.query.calorie) || 0
-            const age = parseInt(ctx.request.query.age) || 0
+            const maxCal = parseInt(ctx.request.query.max_cal) || null
+            const minAge = parseInt(ctx.request.query.min_age) || null
 
             const sort = ctx.request.query.sort == "alphabet" ?
                 "RecipeName" :
                 ctx.request.query.sort == "calorie" ?
                     "CalorieLevel" : "RecipeId"
 
-            const filter = recipeFilterBuilder(types, allergies, calorie, age)
+            const filter = recipeFilterBuilder(types, allergies, maxCal, minAge)
 
             results = await query(`
         SELECT
@@ -229,15 +238,21 @@ router
         try {
             const types = ctx.request.query.types || ""
             const allergies = ctx.request.query.allergies || ""
-            const calorie = parseInt(ctx.request.query.calorie) || 0
-            const age = parseInt(ctx.request.query.age) || 0
+            const maxCal = parseInt(ctx.request.query.max_cal) || null
+            const minAge = parseInt(ctx.request.query.min_age) || null
 
-            const filter = recipeFilterBuilder(types, allergies, calorie, age)
+            const filter = recipeFilterBuilder(types, allergies, maxCal, minAge)
 
             const rtn = await query(`        
             SELECT count(*) as count from (
                 SELECT
                     RecipeId,
+                    RecipeName,
+                    CookingId,
+                    MinAge,
+                    CalorieLevel,
+                    Details,
+                    CookingTime,
                     GROUP_CONCAT(DISTINCT TypeId) as TypeIds,
                     GROUP_CONCAT(DISTINCT TypeName) as TypeNames,
                     GROUP_CONCAT(DISTINCT IngredientId) as IngredientIds,
