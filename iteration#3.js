@@ -92,7 +92,7 @@ router
             await syncFeeds()
 
             console.log(ctx.params)
-            const recipes = await query(`SELECT \`RecipeName\` from RECIPE;`) //TODO: avoid inject
+            const recipes = await query(`SELECT RecipeName, RecipeId from Recipe;`) //TODO: avoid inject
             //TODO: add nu results
             //TODO: add cache for results
             let rtn = []
@@ -101,6 +101,7 @@ router
                     type: 'food',
                     name: item['RecipeName'].split(',')[0].trim(),
                     fullname: item['RecipeName'],
+                    id: item.RecipeId,
                 })
             })
             // process.feedItems.forEach((feedItem) => {
