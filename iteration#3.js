@@ -162,7 +162,7 @@ router
                 ctx.request.query.sort == "distance" ?
                     `(POW((longitude-${loc[0]}),2) + POW((latitude-${loc[1]}),2))` : "RestID"
 
-            result = await query(`SELECT * from Restaurant join Type on Restaurant.RestTypeId = Type.TypeId order by ${sort};`)
+            result = await query(`SELECT * from Restaurant natural join RestType order by ${sort};`)
 
             ctx.body = result
         } catch (e) {
